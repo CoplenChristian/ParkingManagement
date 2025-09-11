@@ -1,0 +1,11 @@
+app:
+  spotStore:
+    type: INMEMORY      # INMEMORY FOR NOW; FUTURE STATE: REDIS
+    initialCapacity: 1024
+    loadFactor: 0.75
+  seed:
+    enabled: true       # Toggle seeding on/off
+    count: 100           # Number of random desks to create
+spring:
+  profiles:
+    active: dev

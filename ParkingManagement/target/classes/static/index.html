@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parking Manager — API Tester</title>
+  <style>
+    :root { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    body { margin: 0; padding: 24px; background:#0b0f19; color:#e6e9ef; }
+    h1 { margin: 0 0 16px; font-size: 20px; }
+    h2 { font-size:16px; margin:0 0 8px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .card { background:#121828; border:1px solid #23283b; border-radius: 12px; padding: 16px; }
+    .row { display:flex; gap:8px; align-items:center; margin:8px 0; }
+    input, select { flex:1; padding:10px; border-radius: 8px; border:1px solid #2a3150; background:#0e1424; color:#e6e9ef; }
+    button { padding:10px 14px; border-radius: 8px; border:1px solid #2a3150; background:#1a2040; color:#e6e9ef; cursor:pointer; }
+    button:hover { background:#232a52; }
+    .muted { color:#9aa4b2; font-size: 12px; }
+    .ok { color:#5ee1a3; }
+    .err { color:#ff8a8a; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; padding:8px; border-bottom:1px solid #23283b; }
+    .toolbar { display:flex; gap:8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .pill { padding: 3px 8px; border-radius: 999px; border:1px solid #2a3150; font-size: 12px; }
+    .status-AVAILABLE { color:#5ee1a3; }
+    .status-OCCUPIED { color:#ffd166; }
+    .small { font-size:12px; }
+    .right { text-align: right; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .hr { border-top:1px solid #23283b; margin: 12px 0; }
+    .nowrap { white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <h1>Parking Manager — API Tester</h1>
+  <div class="muted small">Targets your running Spring Boot app (e.g., http://localhost:8080). Leave Base URL blank to use this page’s origin.</div>
+
+  <div class="toolbar">
+    <label class="pill">Base URL:
+      <input id="baseUrl" value="" placeholder="(blank = same origin)" style="width:280px; margin-left:8px;">
+    </label>
+
+    <button id="btnRefresh">Refresh Spots</button>
+    <button id="btnAvailable">Only Available</button>
+    <button id="btnUsage">Usage</button>
+
+    <span id="status" class="pill muted">Ready</span>
+  </div>
+
+  <!-- Filters for GET /spots -->
+  <div class="card">
+    <h2>List Filters</h2>
+    <div class="row">
+      <select id="fltStatus">
+        <option value="">(status)</option>
+        <option>AVAILABLE</option>
+        <option>OCCUPIED</option>
+      </select>
+      <input id="fltFloor" type="number" min="0" placeholder="Floor" />
+      <input id="fltBay" type="text" placeholder="Bay (e.g., A)" />
+      <select id="fltSize">
+        <option value="">(size)</option>
+        <option>COMPACT</option>
+        <option>STANDARD</option>
+        <option>OVERSIZED</option>
+      </select>
+      <select id="fltEV">
+        <option value="">(EV)</option>
+        <option value="true">EV only</option>
+        <option value="false">Non‑EV</option>
+      </select>
+    </div>
+    <button id="btnApplyFilters">Apply Filters</button>
+  </div>
+
+  <div class="grid">
+    <!-- Create Spot -->
+    <div class="card">
+      <h2>Create Spot</h2>
+      <div class="row">
+        <input id="createFloor" type="number" min="0" placeholder="Floor (≥ 0)" />
+        <input id="createBay" type="text" placeholder="Bay (e.g., A)" />
+      </div>
+      <div class="row">
+        <input id="createSpotNum" type="text" placeholder="Spot Number (e.g., A-12)" />
+        <select id="createSize">
+          <option>STANDARD</option>
+          <option>COMPACT</option>
+          <option>OVERSIZED</option>
+        </select>
+        <select id="createEV">
+          <option value="">EV capable?</option>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      </div>
+      <button id="btnCreate">POST /spots</button>
+      <div id="createMsg" class="muted small"></div>
+    </div>
+
+    <!-- Update Spot -->
+    <div class="card">
+      <h2>Update Spot</h2>
+      <div class="row"><input id="updId" type="text" placeholder="Spot ID (UUID)" /></div>
+      <div class="row">
+        <input id="updFloor" type="number" min="0" placeholder="New Floor (optional)" />
+        <input id="updBay" type="text" placeholder="New Bay (optional)" />
+      </div>
+      <div class="row">
+        <input id="updSpot" type="text" placeholder="New Spot Number (optional)" />
+        <select id="updSize">
+          <option value="">(size)</option>
+          <option>COMPACT</option>
+          <option>STANDARD</option>
+          <option>OVERSIZED</option>
+        </select>
+        <select id="updEV">
+          <option value="">(EV)</option>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      </div>
+      <button id="btnUpdate">PUT /spots/{id}</button>
+      <div class="muted small">Sends only fields you provide; API requires at least one field.</div>
+      <div id="updMsg" class="muted small"></div>
+    </div>
+
+    <!-- Get Spot by ID -->
+    <div class="card">
+      <h2>Get Spot by ID</h2>
+      <div class="row"><input id="getId" type="text" placeholder="Spot ID (UUID)" /></div>
+      <button id="btnGet">GET /spots/{id}</button>
+      <pre id="getResult" class="muted small mono" style="white-space:pre-wrap; margin-top:8px"></pre>
+    </div>
+
+    <!-- Usage -->
+    <div class="card">
+      <h2>Usage</h2>
+      <div class="row">
+        <input id="usageFloor" type="number" min="0" placeholder="Floor (optional)" />
+        <input id="usageBay" type="text" placeholder="Bay (optional)" />
+      </div>
+      <button id="btnUsage2">GET /spots/usage</button>
+      <pre id="usageResult" class="muted small mono" style="white-space:pre-wrap; margin-top:8px"></pre>
+    </div>
+
+    <!-- Car Check-in -->
+    <div class="card">
+      <h2>Car Check‑in</h2>
+      <div class="row">
+        <input id="inPlate" type="text" placeholder="License Plate" />
+        <select id="inSize">
+          <option>STANDARD</option>
+          <option>COMPACT</option>
+          <option>OVERSIZED</option>
+        </select>
+      </div>
+      <div class="row">
+        <input id="inRequestedSpot" type="text" placeholder="Requested Spot ID (optional)" />
+      </div>
+      <button id="btnCheckIn">POST /cars/checkin</button>
+      <pre id="checkInResult" class="muted small mono" style="white-space:pre-wrap; margin-top:8px"></pre>
+    </div>
+
+    <!-- Car Checkout -->
+    <div class="card">
+      <h2>Car Checkout</h2>
+      <div class="row">
+        <input id="outPlate" type="text" placeholder="License Plate" />
+        <button id="btnCheckOut">POST /cars/{plate}/checkout</button>
+      </div>
+      <pre id="checkOutResult" class="muted small mono" style="white-space:pre-wrap; margin-top:8px"></pre>
+    </div>
+  </div>
+
+  <div class="hr"></div>
+
+  <!-- Spots Table -->
+  <div class="card">
+    <h2>Spots</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Floor</th>
+          <th>Bay</th>
+          <th>Spot</th>
+          <th>Size</th>
+          <th>EV</th>
+          <th>Status</th>
+          <th>Last Updated</th>
+          <th class="right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="spotRows">
+        <tr><td colspan="9" class="muted">No data yet — click “Refresh Spots”.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // ===== Config & helpers =====
+    function apiBase() {
+      const v = document.getElementById('baseUrl').value.trim();
+      return v || '';
+    }
+    function url(path) { return apiBase() + path; }
+    function esc(s){ if(s===null||s===undefined)return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    function setStatus(msg, ok=true){ const el=document.getElementById('status'); el.textContent=msg; el.className='pill '+(ok?'ok':'err'); setTimeout(()=>{ el.textContent='Ready'; el.className='pill muted'; },3000); }
+
+    async function api(path, { method='GET', body } = {}) {
+      const headers = { 'Content-Type': 'application/json' };
+      const res = await fetch(url(path), { method, headers, body: body ? JSON.stringify(body) : undefined });
+      const text = await res.text();
+      let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      if (!res.ok) {
+        const msg = (data && (data.error || data.message)) || (res.status + ' ' + res.statusText);
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    // ===== Spots listing & filters =====
+    function buildQuery(params) {
+      const q = Object.entries(params)
+        .filter(([_,v]) => v !== null && v !== undefined && v !== '')
+        .map(([k,v]) => encodeURIComponent(k)+'='+encodeURIComponent(v))
+        .join('&');
+      return q ? ('?'+q) : '';
+    }
+
+    async function refreshSpots(onlyAvailable=false) {
+      const tbody = document.getElementById('spotRows');
+      tbody.innerHTML = '<tr><td colspan="9" class="muted">Loading…</td></tr>';
+
+      const status = document.getElementById('fltStatus').value;
+      const floor  = document.getElementById('fltFloor').value;
+      const bay    = document.getElementById('fltBay').value.trim();
+      const size   = document.getElementById('fltSize').value;
+      const ev     = document.getElementById('fltEV').value;
+
+      const params = {
+        status: onlyAvailable ? 'AVAILABLE' : status || undefined,
+        floor: floor === '' ? undefined : Number(floor),
+        bay: bay || undefined,
+        size: size || undefined,
+        evCapable: ev === '' ? undefined : ev
+      };
+
+      const path = onlyAvailable ? '/spots/available' : '/spots';
+      try {
+        const spots = await api(path + buildQuery(params));
+        if (!spots || spots.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="muted">No spots found.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = '';
+        for (const s of spots) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="mono small">${esc(s.id)}</td>
+            <td>${s.floor}</td>
+            <td>${esc(s.bay || '')}</td>
+            <td>${esc(s.spotNumber || '')}</td>
+            <td>${esc(s.size || '')}</td>
+            <td class="nowrap">${s.evCapable ? 'EV' : ''}</td>
+            <td class="status-${s.status}">${s.status}</td>
+            <td class="small">${esc(s.lastUpdated || '')}</td>
+            <td class="right">
+              <button data-id="${s.id}" data-action="get">Get</button>
+              <button data-id="${s.id}" data-action="avail">Mark Available</button>
+              <button data-id="${s.id}" data-action="occupy">Mark Occupied</button>
+            </td>`;
+          tbody.appendChild(tr);
+        }
+        setStatus('Loaded ✔');
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="9" class="err">${esc(e.message)}</td></tr>`;
+        setStatus('Load failed', false);
+      }
+    }
+
+    // ===== Create / Update / Get Spot =====
+    async function doCreateSpot() {
+      const floor = document.getElementById('createFloor').value;
+      const bay = document.getElementById('createBay').value.trim();
+      const spotNumber = document.getElementById('createSpotNum').value.trim();
+      const size = document.getElementById('createSize').value;
+      const ev = document.getElementById('createEV').value;
+
+      const msg = document.getElementById('createMsg');
+      msg.textContent = '';
+      try {
+        const body = {
+          floor: floor === '' ? null : Number(floor),
+          bay: bay || null,
+          spotNumber: spotNumber || null,
+          size: size || null,
+          evCapable: ev === '' ? null : (ev === 'true')
+        };
+        const created = await api('/spots', { method:'POST', body });
+        msg.textContent = 'Created: ' + created.id;
+        setStatus('Created ✔');
+        await refreshSpots();
+      } catch (e) {
+        msg.textContent = e.message; msg.className='err small';
+        setStatus('Create failed', false);
+      }
+    }
+
+    async function doUpdateSpot() {
+      const id = document.getElementById('updId').value.trim();
+      const floor = document.getElementById('updFloor').value;
+      const bay = document.getElementById('updBay').value.trim();
+      const spot = document.getElementById('updSpot').value.trim();
+      const size = document.getElementById('updSize').value;
+      const ev = document.getElementById('updEV').value;
+      const msg = document.getElementById('updMsg');
+
+      msg.textContent = '';
+      if (!id) { msg.textContent = 'Spot ID required.'; msg.className='err small'; return; }
+
+      const body = {};
+      if (floor !== '') body.floor = Number(floor);
+      if (bay !== '') body.bay = bay;
+      if (spot !== '') body.spotNumber = spot;
+      if (size !== '') body.size = size;
+      if (ev !== '') body.evCapable = (ev === 'true');
+
+      try {
+        const updated = await api(`/spots/${encodeURIComponent(id)}`, { method:'PUT', body });
+        setStatus('Updated ✔');
+        msg.textContent = 'Updated: ' + updated.id;
+        await refreshSpots();
+      } catch (e) {
+        msg.textContent = e.message; msg.className='err small';
+        setStatus('Update failed', false);
+      }
+    }
+
+    async function doGetSpotById() {
+      const id = document.getElementById('getId').value.trim();
+      const out = document.getElementById('getResult');
+      out.textContent = '';
+      if (!id) { out.textContent = 'Spot ID required.'; return; }
+      try {
+        const data = await api(`/spots/${encodeURIComponent(id)}`);
+        out.textContent = JSON.stringify(data, null, 2);
+        setStatus('Fetched ✔');
+      } catch (e) {
+        out.textContent = e.message;
+        setStatus('Get failed', false);
+      }
+    }
+
+    // ===== Usage =====
+    async function doUsage() {
+      const floor = document.getElementById('usageFloor').value;
+      const bay = document.getElementById('usageBay').value.trim();
+      const out = document.getElementById('usageResult');
+      out.textContent = '';
+      const query = buildQuery({
+        floor: floor === '' ? undefined : Number(floor),
+        bay: bay || undefined
+      });
+      try {
+        const data = await api('/spots/usage' + query);
+        out.textContent = JSON.stringify(data, null, 2);
+        setStatus('Usage ✔');
+      } catch (e) {
+        out.textContent = e.message;
+        setStatus('Usage failed', false);
+      }
+    }
+
+    // ===== Cars: check-in / checkout =====
+    async function doCheckIn() {
+      const plate = document.getElementById('inPlate').value.trim();
+      const size = document.getElementById('inSize').value;
+      const requested = document.getElementById('inRequestedSpot').value.trim();
+      const out = document.getElementById('checkInResult');
+      out.textContent = '';
+      try {
+        const body = {
+          licensePlate: plate,
+          carSize: size || null,
+          requestedSpotId: requested || null
+        };
+        const assigned = await api('/cars/checkin', { method:'POST', body });
+        out.textContent = JSON.stringify(assigned, null, 2);
+        setStatus('Checked in ✔');
+        await refreshSpots(); // reflect OCCUPIED
+      } catch (e) {
+        out.textContent = e.message;
+        setStatus('Check-in failed', false);
+      }
+    }
+
+    async function doCheckOut() {
+      const plate = document.getElementById('outPlate').value.trim();
+      const out = document.getElementById('checkOutResult');
+      out.textContent = '';
+      if (!plate) { out.textContent = 'License Plate required.'; return; }
+      try {
+        const receipt = await api(`/cars/${encodeURIComponent(plate)}/checkout`, { method:'POST' });
+        out.textContent = JSON.stringify(receipt, null, 2);
+        setStatus('Checked out ✔');
+        await refreshSpots(); // reflect AVAILABLE
+      } catch (e) {
+        out.textContent = e.message;
+        setStatus('Checkout failed', false);
+      }
+    }
+
+    // ===== Table button delegation (spot actions) =====
+    document.getElementById('spotRows').addEventListener('click', async (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      const id = btn.getAttribute('data-id');
+      const action = btn.getAttribute('data-action');
+      if (!id) return;
+      try {
+        if (action === 'get') {
+          document.getElementById('getId').value = id;
+          await doGetSpotById();
+        } else if (action === 'avail') {
+          await api(`/spots/${encodeURIComponent(id)}/available`, { method:'POST' });
+          setStatus('Marked available ✔');
+          await refreshSpots();
+        } else if (action === 'occupy') {
+          await api(`/spots/${encodeURIComponent(id)}/occupied`, { method:'POST' });
+          setStatus('Marked occupied ✔');
+          await refreshSpots();
+        }
+      } catch (e2) {
+        setStatus(e2.message, false);
+      }
+    });
+
+    // ===== Wire buttons =====
+    document.getElementById('btnRefresh').addEventListener('click', () => refreshSpots(false));
+    document.getElementById('btnAvailable').addEventListener('click', () => refreshSpots(true));
+    document.getElementById('btnApplyFilters').addEventListener('click', () => refreshSpots(false));
+
+    document.getElementById('btnCreate').addEventListener('click', doCreateSpot);
+    document.getElementById('btnUpdate').addEventListener('click', doUpdateSpot);
+    document.getElementById('btnGet').addEventListener('click', doGetSpotById);
+
+    document.getElementById('btnUsage').addEventListener('click', doUsage);
+    document.getElementById('btnUsage2').addEventListener('click', doUsage);
+
+    document.getElementById('btnCheckIn').addEventListener('click', doCheckIn);
+    document.getElementById('btnCheckOut').addEventListener('click', doCheckOut);
+
+    // Auto-refresh once on load
+    refreshSpots();
+  </script>
+</body>
+</html>
